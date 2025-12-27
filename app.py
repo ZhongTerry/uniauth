@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 from urllib.parse import urlparse, urljoin
 from dotenv import load_dotenv  # [新增]
 load_dotenv()
+from werkzeug.middleware.proxy_fix import ProxyFix # 确保导入了
 
 # [新增] 安全跳转校验函数
 def is_safe_url(target):
@@ -29,6 +30,7 @@ def is_safe_url(target):
     # 要求：协议必须是 http/https，且域名必须是当前站点
     return test_url.scheme in ('http', 'https') and \
            ref_url.netloc == test_url.netloc
+           
 
 
 # === 基础配置 ===
@@ -43,6 +45,15 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+if os.getenv('FLASK_ENV') == 'production':
+    # 只有在生产环境，才信任 Nginx 传来的 Header
+    # x_for=1, x_proto=1, x_host=1 分别对应 X-Forwarded-For, Proto, Host
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+    )
+    print("🚀 生产环境模式：已启用 ProxyFix 信任 Nginx 代理")
+else:
+    print("🏠 开发环境模式：直接访问本地端口")
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 限制最大 2MB
