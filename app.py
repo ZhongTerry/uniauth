@@ -19,6 +19,8 @@ from flask_migrate import Migrate
 import uuid # 用于生成唯一文件名
 from werkzeug.utils import secure_filename
 from urllib.parse import urlparse, urljoin
+from dotenv import load_dotenv  # [新增]
+load_dotenv()
 
 # [新增] 安全跳转校验函数
 def is_safe_url(target):
@@ -34,7 +36,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'uniauth.db')
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here-change-in-production111'
+# app.secret_key = 'your-secret-key-here-change-in-production111'
 app.config['SESSION_COOKIE_NAME'] = 'uniauth_session' 
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH
@@ -52,12 +54,26 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # 邮件配置 (保持你之前的配置)
-app.config['MAIL_SERVER'] = 'smtp.qq.com'
+app.secret_key = os.getenv('SECRET_KEY', 'dev-key-please-change')
+
+# [修改] 邮件配置
+app.config['MAIL_SERVER'] = 'smtp.163.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = '123456@qq.com' # 请填写真实邮箱
-app.config['MAIL_PASSWORD'] = 'your_auth_code' # 请填写授权码
-app.config['MAIL_DEFAULT_SENDER'] = 'UniAuth <123456@qq.com>' # 请保持一致
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+if os.getenv('FLASK_ENV') == 'production':
+    # 1. 关闭 Debug 模式 (致命隐患修复)
+    app.config['DEBUG'] = False
+        
+    # 2. Cookie 安全设置
+    app.config['SESSION_COOKIE_HTTPONLY'] = True  # 禁止 JS 读取 Cookie (防 XSS)
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax' # 防 CSRF
+    app.config['SESSION_COOKIE_SECURE'] = True    # [注意] 仅允许 HTTPS 发送 Cookie
 
 ALLOWED_DOMAINS = ['qq.com', '163.com', '126.com', 'sina.com', 'aliyun.com', 'gmail.com', 'outlook.com']
 
@@ -301,7 +317,7 @@ def register():
             flash('邮箱已存在', 'error')
         else:
             # 3. 创建用户
-            is_first_user = (User.query.count() == 0)
+            # is_first_user = (User.query.count() == 0)
             new_user = User(
                 username=username, 
                 password_hash=generate_password_hash(password), 
@@ -742,7 +758,28 @@ def revoke_authorization(client_id):
     
     flash(f'已撤销对 {app_name} 的授权，该应用将无法再访问您的账户。', 'success')
     return redirect(url_for('authorized_apps'))
+# [新增] 命令行创建管理员
+@app.cli.command("create-admin")
+def create_admin():
+    """手动创建一个管理员账号"""
+    import click
+    username = click.prompt("请输入管理员用户名")
+    email = click.prompt("请输入邮箱")
+    password = click.prompt("请输入密码", hide_input=True)
+    
+    if User.query.filter((User.username==username) | (User.email==email)).first():
+        print("❌ 用户已存在")
+        return
 
+    user = User(
+        username=username, 
+        email=email, 
+        password_hash=generate_password_hash(password), 
+        is_admin=True
+    )
+    db.session.add(user)
+    db.session.commit()
+    print(f"✅ 管理员 {username} 创建成功！")
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

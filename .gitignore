@@ -1,0 +1,29 @@
+# --- Python 相关 ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# --- 安全与环境相关 (核心！) ---
+.env
+secret_key.txt
+*.key
+*.pem
+
+# --- 数据库相关 (绝对不能上传) ---
+uniauth.db
+instance/
+# 如果你以后迁移到了 MySQL，也不要上传 dump 文件
+*.sql
+
+# --- 静态资源与上传 ---
+# 我们保留文件夹，但不上传里面的用户头像
+static/uploads/*
+!static/uploads/.gitkeep
+
+# --- IDE 相关 ---
+.idea/
+.vscode/
+*.swps
