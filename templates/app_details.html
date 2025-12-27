@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* 详情页也需要这些复制按钮的样式，这里复用 */
+    .copy-input-group {
+        display: flex; align-items: center;
+        border: 1px solid #dee2e6; border-radius: 6px;
+        background-color: #f8f9fa; overflow: hidden;
+        transition: border-color 0.2s;
+    }
+    .copy-input-group:hover { border-color: #b3b3b3; }
+    .copy-input-group input {
+        border: none; box-shadow: none; background: transparent;
+        flex: 1; padding: 10px; font-family: monospace;
+        font-size: 13px; color: #555; outline: none; cursor: text;
+    }
+    .copy-btn-icon {
+        border: none; border-left: 1px solid #dee2e6;
+        background: white; color: #666; width: 40px; align-self: stretch;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s; font-size: 16px;
+    }
+    .copy-btn-icon:hover { background: #f0f0f0; color: #007bff; }
+    .copy-btn-icon:active { background: #e2e6ea; }
+</style>
+
+<div class="header-row">
+    <div>
+        <a href="/dashboard" style="text-decoration: none; color: #666; font-size: 14px;">← 返回仪表盘</a>
+        <h2 style="margin: 5px 0;">{{ app.name }}</h2>
+        <span style="background: #e9ecef; color: #666; padding: 2px 8px; border-radius: 4px; font-size: 12px;">App Details</span>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <a href="/apps/{{ app.client_id }}/stats" class="btn" style="background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); color: white; text-decoration: none; display: flex; align-items: center; gap: 5px;">
+            📈 数据分析
+        </a>
+        <form action="/apps/{{ app.client_id }}/delete" method="POST" onsubmit="return confirm('⚠️ 确定要彻底删除此应用吗？此操作不可撤销，且会使得所有已分发的 Token 失效。');" style="margin:0;">
+            <button type="submit" class="btn btn-danger">🗑️ 删除应用</button>
+        </form>
+    </div>
+</div>
+
+<!-- 统计数据 -->
+<h3 style="margin-top: 30px; color: #555;">📊 调用统计</h3>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 30px;">
+    <div class="card" style="margin:0; text-align: center; padding: 20px;">
+        <div style="font-size: 28px; font-weight: bold; color: #007bff;">{{ stats['1h'] }}</div>
+        <div style="font-size: 12px; color: #888; margin-top: 5px;">近 1 小时</div>
+    </div>
+    <div class="card" style="margin:0; text-align: center; padding: 20px;">
+        <div style="font-size: 28px; font-weight: bold; color: #28a745;">{{ stats['24h'] }}</div>
+        <div style="font-size: 12px; color: #888; margin-top: 5px;">近 24 小时</div>
+    </div>
+    <div class="card" style="margin:0; text-align: center; padding: 20px;">
+        <div style="font-size: 28px; font-weight: bold; color: #fd7e14;">{{ stats['7d'] }}</div>
+        <div style="font-size: 12px; color: #888; margin-top: 5px;">近 7 天</div>
+    </div>
+    <div class="card" style="margin:0; text-align: center; padding: 20px;">
+        <div style="font-size: 28px; font-weight: bold; color: #6f42c1;">{{ stats['30d'] }}</div>
+        <div style="font-size: 12px; color: #888; margin-top: 5px;">近 30 天</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex-wrap: wrap;">
+    <!-- 基本信息 -->
+    <div class="card" style="margin:0;">
+        <h3 style="margin-top:0; border-bottom: 1px solid #eee; padding-bottom: 10px;">基本信息</h3>
+        <form action="/apps/{{ app.client_id }}/update" method="POST">
+            <div class="input-group">
+                <label>应用名称</label>
+                <input type="text" name="name" value="{{ app.name }}" required>
+            </div>
+            <div class="input-group">
+                <label>回调地址 (Redirect URI)</label>
+                <input type="text" name="redirect_uri" value="{{ app.redirect_uri }}" required>
+            </div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button type="submit" class="btn btn-primary">保存修改</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 凭证管理 -->
+    <div class="card" style="margin:0;">
+        <h3 style="margin-top:0; border-bottom: 1px solid #eee; padding-bottom: 10px;">凭证管理 (Credentials)</h3>
+        
+        <!-- Client ID (方案B) -->
+        <div class="input-group">
+            <label>Client ID</label>
+            <div class="copy-input-group">
+                <input type="text" value="{{ app.client_id }}" readonly>
+                <button type="button" class="copy-btn-icon" onclick="copyToClipboard(this.previousElementSibling)" title="复制 ID">📋</button>
+            </div>
+        </div>
+        
+        <!-- Client Secret (方案B) -->
+        <div class="input-group">
+            <label>Client Secret</label>
+            <div class="copy-input-group">
+                <input type="text" value="{{ app.client_secret }}" readonly>
+                <button type="button" class="copy-btn-icon" onclick="copyToClipboard(this.previousElementSibling)" title="复制 Secret">📋</button>
+            </div>
+            <p style="font-size: 12px; color: #dc3545; margin-top: 5px;">⚠️ Secret 泄露? 请立即重置。</p>
+        </div>
+
+        <form action="/apps/{{ app.client_id }}/regenerate_secret" method="POST" onsubmit="return confirm('确定要重置 Client Secret 吗？\n\n旧的 Secret 将立即失效，您需要更新所有客户端代码。');" style="text-align: right;">
+            <button type="submit" class="btn btn-ghost" style="color: #dc3545; border-color: #dc3545;">🔄 重置 Secret</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

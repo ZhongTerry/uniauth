@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-row">
+    <div>
+        <a href="/dashboard" style="text-decoration: none; color: #666; font-size: 14px;">← 返回仪表盘</a>
+        <h2 style="margin: 5px 0;">个人设置</h2>
+    </div>
+</div>
+<!-- [新增] 授权管理入口卡片 -->
+<div class="card" style="max-width: 600px; margin: 0 auto 20px auto; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border: 1px solid #e9ecef;">
+    <div>
+        <h4 style="margin: 0 0 5px 0;">已授权的应用</h4>
+        <p style="margin: 0; font-size: 12px; color: #666;">查看并管理您可以访问账号信息的第三方应用</p>
+    </div>
+    <a href="/settings/authorized" class="btn" style="background: white; color: #333; border: 1px solid #ddd; font-size: 13px;">
+        管理授权 →
+    </a>
+</div>
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+    <h3 style="margin-top:0; margin-bottom: 20px;">👤 基础资料</h3>
+    
+    <!-- [关键] 必须添加 enctype="multipart/form-data" -->
+    <form method="POST" enctype="multipart/form-data" style="margin-bottom: 40px; border-bottom: 1px solid #eee; padding-bottom: 30px;">
+        <input type="hidden" name="action" value="update_info">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+        <!-- 头像上传区 -->
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="position: relative; display: inline-block; cursor: pointer;" onclick="document.getElementById('fileInput').click()">
+                <img src="{{ user.avatar }}" id="avatarPreview" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #eee; object-fit: cover; transition: 0.2s;">
+                <!-- 遮罩提示 -->
+                <div style="position: absolute; bottom: 0; right: 0; background: #007bff; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: 2px solid white;">
+                    📷
+                </div>
+            </div>
+            <p style="font-size: 12px; color: #999; margin-top: 5px;">点击头像上传图片 (最大 2MB)</p>
+            
+            <!-- 隐藏的文件输入框 -->
+            <input type="file" name="avatar_file" id="fileInput" accept="image/*" style="display: none;" onchange="previewImage(this)">
+        </div>
+
+        <div class="input-group">
+            <label>头像链接 (也可以直接填 URL)</label>
+            <input type="text" name="avatar_url" id="urlInput" value="{{ user.avatar }}" placeholder="https://..." oninput="document.getElementById('avatarPreview').src = this.value">
+        </div>
+
+        <!-- 其他资料 (保持不变) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="input-group">
+                <label>用户名 (不可修)</label>
+                <input type="text" value="{{ user.username }}" disabled style="background:#f8f9fa; cursor: not-allowed;">
+            </div>
+            <div class="input-group">
+                <label>邮箱 (登录凭证)</label>
+                <input type="text" value="{{ user.email }}" disabled style="background:#f8f9fa; cursor: not-allowed;">
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="input-group">
+                <label>手机号 (选填)</label>
+                <input type="text" name="phone" value="{{ user.phone or '' }}" placeholder="仅授权的应用可见">
+            </div>
+            <div class="input-group">
+                <label>生日 (选填)</label>
+                <input type="date" name="birthday" value="{{ user.birthday or '' }}">
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>个人简介 (选填)</label>
+            <textarea name="bio" rows="3" placeholder="介绍一下你自己..." style="width:100%; padding:10px; border:1px solid #dee2e6; border-radius:6px; font-family:inherit;">{{ user.bio or '' }}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">保存资料</button>
+    </form>
+
+    <!-- 密码修改部分 (保持不变) -->
+    <h3>🔒 安全设置</h3>
+    <form method="POST">
+        <input type="hidden" name="action" value="update_password">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="input-group">
+            <label>当前密码</label>
+            <input type="password" name="old_password" required placeholder="请输入旧密码">
+        </div>
+        <div class="input-group">
+            <label>新密码</label>
+            <input type="password" name="new_password" required placeholder="请输入新密码">
+        </div>
+        <div class="input-group">
+            <label>确认新密码</label>
+            <input type="password" name="confirm_password" required placeholder="再次输入新密码">
+        </div>
+        <button type="submit" class="btn btn-ghost btn-block">更新密码</button>
+    </form>
+</div>
+
+<script>
+    // 图片上传预览逻辑
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('avatarPreview').src = e.target.result;
+                // 清空 URL 输入框，避免混淆
+                document.getElementById('urlInput').value = ''; 
+                document.getElementById('urlInput').placeholder = "已选择本地文件...";
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>
+{% endblock %}

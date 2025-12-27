@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniAuth - 统一认证中心</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --primary-hover: #0069d9;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --danger: #dc3545;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --border: #dee2e6;
+            --text-main: #2c3e50;
+        }
+
+        body {
+            font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0; padding: 0;
+            background-color: var(--bg); color: #333;
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+        }
+
+        .navbar {
+            background: var(--card-bg); padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .logo { font-size: 20px; font-weight: bold; color: #333; text-decoration: none; display: flex; align-items: center; gap: 10px;}
+        .logo-icon { width: 32px; height: 32px; background: var(--gradient-1); border-radius: 8px; color: white; display: flex; align-items: center; justify-content: center; font-size: 18px;}
+
+        .container {
+            max-width: 900px; margin: 40px auto; width: 95%;
+            flex: 1;
+        }
+
+        /* 卡片风格 */
+        .card {
+            background: var(--card-bg); padding: 30px;
+            border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            margin-bottom: 20px; border: 1px solid var(--border);
+        }
+
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; color: #555; font-size: 13px;}
+        input[type="text"], input[type="password"], input[type="email"], input[type="date"] {
+            width: 100%; padding: 12px; border: 1px solid var(--border);
+            border-radius: 6px; font-size: 14px;
+            box-sizing: border-box; transition: 0.2s;
+        }
+        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
+        input.readonly-code { font-family: monospace; background: #f8f9fa; color: #666; cursor: copy;}
+
+        /* 按钮 */
+        .btn {
+            display: inline-block; padding: 10px 20px; border: none; border-radius: 6px;
+            background: var(--primary); color: white; cursor: pointer; 
+            font-weight: 500; text-decoration: none; font-size: 14px;
+            transition: all 0.2s; text-align: center;
+        }
+        .btn:hover { transform: translateY(-1px); opacity: 0.9; }
+        .btn-primary { background: var(--gradient-1); border: none; }
+        .btn-block { display: block; width: 100%; }
+        .btn-ghost { background: transparent; color: #666; border: 1px solid #ddd; }
+        .btn-ghost:hover { background: #eee; color: #333; }
+        .btn-danger { background: var(--danger); }
+
+        .flash-msg { padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; }
+        .flash-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        
+        /* 布局微调 */
+        .auth-box { max-width: 400px; margin: 60px auto; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .grid-apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="/" class="logo">
+            <div class="logo-icon">U</div>
+            UniAuth
+        </a>
+        <div>
+            {% if session.get('user_id') %}
+                <a href="/logout" class="btn btn-ghost" style="padding: 6px 12px;">登出</a>
+            {% else %}
+                <a href="/login" style="color:#666; text-decoration:none; font-size:14px;">登录</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-msg flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+<!-- 全局复制提示框 (Toast) -->
+    <div id="toast-msg" style="
+        position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.8); color: white; padding: 10px 20px;
+        border-radius: 50px; font-size: 14px; z-index: 9999;
+        opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2); font-weight: 500;">
+        ✅ 已复制到剪贴板
+    </div>
+
+    <script>
+        function copyToClipboard(inputElement) {
+            // 1. 选中文字 (视觉反馈)
+            inputElement.select();
+            inputElement.setSelectionRange(0, 99999); // 兼容移动端
+
+            // 2. 执行复制
+            if (navigator.clipboard && window.isSecureContext) {
+                // 现代浏览器 API
+                navigator.clipboard.writeText(inputElement.value).then(() => {
+                    showToast("✅ 已复制: " + inputElement.value.substring(0, 8) + "...");
+                });
+            } else {
+                // 兼容旧版 (http 环境)
+                try {
+                    document.execCommand('copy');
+                    showToast("✅ 已复制到剪贴板");
+                } catch (err) {
+                    showToast("❌ 复制失败，请手动复制");
+                }
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast-msg');
+            toast.innerText = msg;
+            toast.style.opacity = '1';
+            
+            // 清除之前的定时器，防止闪烁
+            if (window.toastTimeout) clearTimeout(window.toastTimeout);
+            
+            window.toastTimeout = setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 2000);
+        }
+        document.addEventListener("DOMContentLoaded", function() {
+            var token = "{{ csrf_token() }}";
+            var forms = document.getElementsByTagName('form');
+            for(var i = 0; i < forms.length; i++) {
+                if(forms[i].method.toUpperCase() === 'POST' && !forms[i].querySelector('input[name="csrf_token"]')) {
+                    var input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'csrf_token';
+                    input.value = token;
+                    forms[i].appendChild(input);
+                }
+            }
+        });
+    </script>
+</html>

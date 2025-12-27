@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* === 页面专属样式 === */
+    
+    /* 弹窗遮罩 */
+    .modal-overlay {
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+        backdrop-filter: blur(3px);
+    }
+    
+    /* 弹窗主体 */
+    .modal-card {
+        background: white; width: 90%; max-width: 500px; padding: 30px;
+        border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        animation: popIn 0.2s ease-out;
+    }
+    @keyframes popIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    
+    /* 操作小按钮 */
+    .action-btn { 
+        cursor: pointer; font-size: 12px; padding: 4px 8px; 
+        border-radius: 4px; border: 1px solid #ddd; 
+        background: white; color: #555; text-decoration: none; 
+        display: inline-flex; align-items: center; justify-content: center;
+        transition: all 0.2s;
+    }
+    .action-btn:hover { background: #f8f9fa; color: #333; transform: translateY(-1px); }
+    
+    .btn-del:hover { background: #dc3545; color: white; border-color: #dc3545; }
+    
+    .btn-manage { 
+        background: #e7f1ff; color: #007bff; border: 1px solid #b3d7ff; font-weight: 500;
+    }
+    .btn-manage:hover { background: #007bff; color: white; border-color: #007bff; }
+
+    /* 用户信息 */
+    .user-profile-link { 
+        display:flex; align-items:center; gap:10px; 
+        text-decoration: none; color: #333; 
+        padding: 6px 12px; border-radius: 30px; 
+        transition: background 0.2s; border: 1px solid transparent;
+    }
+    .user-profile-link:hover { 
+        background: white; border-color: #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+    }
+
+    /* === [新增] 复制组合框样式 (方案B) === */
+    .copy-input-group {
+        display: flex;
+        align-items: center;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        background-color: #f8f9fa; /* 默认灰色背景，暗示只读 */
+        overflow: hidden;
+        transition: border-color 0.2s;
+    }
+    .copy-input-group:hover {
+        border-color: #b3b3b3;
+    }
+    .copy-input-group input {
+        border: none;
+        box-shadow: none;
+        background: transparent;
+        flex: 1; /* 撑满剩余空间 */
+        padding: 10px;
+        font-family: monospace; /* 等宽字体 */
+        font-size: 13px;
+        color: #555;
+        outline: none;
+        cursor: text; /* 允许选中文本 */
+    }
+    .copy-btn-icon {
+        border: none;
+        border-left: 1px solid #dee2e6;
+        background: white;
+        color: #666;
+        width: 40px; /* 固定宽度 */
+        align-self: stretch; /* 高度拉伸 */
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        font-size: 16px;
+    }
+    .copy-btn-icon:hover {
+        background: #f0f0f0;
+        color: #007bff;
+    }
+    .copy-btn-icon:active {
+        background: #e2e6ea;
+    }
+</style>
+
+<div class="header-row">
+    <div>
+        <h2 style="margin:0;">开发者仪表盘</h2>
+        <p style="margin:5px 0 0 0; color:#666; font-size:14px;">管理您的 OAuth 应用</p>
+    </div>
+    
+    <a href="/profile" class="user-profile-link" title="点击修改资料">
+        <img src="{{ user.avatar }}" style="width:32px; height:32px; border-radius:50%; object-fit: cover;">
+        <span style="font-weight:bold; font-size: 14px;">{{ user.username }}</span>
+        <span style="color:#999; font-size: 12px;">⚙️</span>
+    </a>
+    <div style="display:flex; align-items:center; gap:15px;">
+        
+        <a href="/stats" style="
+        text-decoration: none; background: #e9ecef; color: #555; 
+        padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+        display: flex; align-items: center; gap: 5px;">
+        🌍 全站数据
+    </a>
+
+    <!-- 管理员入口 (仅 Admin 可见) -->
+    {% if user.is_admin %}
+    <a href="/admin/stats" style="
+        text-decoration: none; background: #222; color: #ffd700; 
+        padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold;
+        display: flex; align-items: center; gap: 5px;">
+        🛡️ 管理后台
+    </a>
+    {% endif %}
+
+        <!-- 用户信息链接 (保持不变) -->
+        <a href="/profile" class="user-profile-link" ...>...</a>
+    </div>
+</div>
+
+<!-- 创建新应用区域 -->
+<div class="card">
+    <h3 style="margin-top:0; font-size:16px; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 20px;">
+        🚀 创建新应用
+    </h3>
+    <form action="/apps/new" method="POST" style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
+        <div style="flex:1; min-width:200px;">
+            <label>应用名称</label>
+            <input type="text" name="name" placeholder="例如: My Awesome Blog" required>
+        </div>
+        <div style="flex:2; min-width:300px;">
+            <label>回调地址 (Callback URL)</label>
+            <input type="text" name="redirect_uri" placeholder="http://127.0.0.1:8000/callback" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="height:42px; min-width: 100px;">创建 App</button>
+    </form>
+</div>
+
+<!-- 应用列表区域 -->
+<h3 style="color:#555; margin-left:5px; margin-top: 30px;">我的应用列表</h3>
+<div class="grid-apps">
+    {% for app in apps %}
+    <div class="card" style="margin-bottom:0; display:flex; flex-direction:column; transition: transform 0.2s; position: relative;">
+        <!-- 卡片头部 -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:15px;">
+            <div style="font-weight:bold; font-size:18px; color: var(--text-main);">
+                <a href="/apps/{{ app.client_id }}" style="text-decoration:none; color:inherit;">{{ app.name }}</a>
+            </div>
+            
+            <div style="display:flex; gap:5px;">
+                <a href="/apps/{{ app.client_id }}" class="action-btn btn-manage" target="_blank" title="查看详情与统计">📊 管理</a>
+                
+                <button type="button" class="action-btn" 
+                    onclick="openEditModal('{{ app.client_id }}', '{{ app.name }}', '{{ app.redirect_uri }}')"
+                    title="快速修改回调地址">✎</button>
+                
+                <form action="/apps/{{ app.client_id }}/delete" method="POST" onsubmit="return confirm('确定要删除这个应用吗？');" style="margin:0;">
+                    <button type="submit" class="action-btn btn-del" title="删除应用">🗑️</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 卡片主体：Client ID / Secret (使用方案B样式) -->
+        <div class="input-group">
+            <label>Client ID</label>
+            <div class="copy-input-group">
+                <input type="text" value="{{ app.client_id }}" readonly>
+                <button type="button" class="copy-btn-icon" onclick="copyToClipboard(this.previousElementSibling)" title="复制 ID">📋</button>
+            </div>
+        </div>
+        <div class="input-group">
+            <label>Client Secret</label>
+            <div class="copy-input-group">
+                <input type="text" value="{{ app.client_secret }}" readonly>
+                <button type="button" class="copy-btn-icon" onclick="copyToClipboard(this.previousElementSibling)" title="复制 Secret">📋</button>
+            </div>
+        </div>
+        
+        <!-- 卡片底部 -->
+        <div style="margin-top:auto; padding-top:10px; border-top:1px solid #eee;">
+            <label style="font-size:11px; color:#999;">回调地址:</label>
+            <div style="font-size:13px; color:#555; word-break:break-all; font-family: monospace;">
+                {{ app.redirect_uri }}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div style="grid-column: 1/-1; text-align:center; padding:60px 20px; color:#999; border: 2px dashed #eee; border-radius: 10px;">
+        <div style="font-size: 40px; margin-bottom: 10px;">📭</div>
+        <div>暂无应用，请在上方创建您的第一个 OAuth 应用。</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 编辑应用的弹窗 -->
+<div id="editModal" class="modal-overlay">
+    <div class="modal-card">
+        <h3 style="margin-top:0; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">
+            ✎ 编辑应用信息
+        </h3>
+        <form id="editForm" method="POST">
+            <div class="input-group">
+                <label>应用名称</label>
+                <input type="text" name="name" id="editName" required>
+            </div>
+            <div class="input-group">
+                <label>回调地址 (Redirect URI)</label>
+                <input type="text" name="redirect_uri" id="editRedirectUri" required>
+                <p style="font-size:12px; color:#999; margin-top:5px; line-height: 1.5;">
+                    ⚠️ 注意：修改此项后，请确保您的客户端代码同步更新。
+                </p>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:30px;">
+                <button type="button" class="btn btn-ghost" onclick="closeEditModal()">取消</button>
+                <button type="submit" class="btn btn-primary">保存修改</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openEditModal(clientId, name, redirectUri) {
+        document.getElementById('editName').value = name;
+        document.getElementById('editRedirectUri').value = redirectUri;
+        document.getElementById('editForm').action = '/apps/' + clientId + '/update';
+        document.getElementById('editModal').style.display = 'flex';
+    }
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+    document.getElementById('editModal').addEventListener('click', function(e) {
+        if (e.target === this) closeEditModal();
+    });
+</script>
+{% endblock %}

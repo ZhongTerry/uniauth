@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- 引入 Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="header-row">
+    <div>
+        <!-- 修复点：这里是返回仪表盘，不能用 app.client_id -->
+        <a href="/dashboard" style="text-decoration: none; color: #666; font-size: 14px;">← 返回仪表盘</a>
+        <h2 style="margin: 5px 0;">🛡️ 管理员统计面板</h2>
+        <p style="margin:0; color:#666; font-size:13px;">全站数据监控与分析</p>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+        <span style="background: #28a745; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold;">Admin</span>
+    </div>
+</div>
+
+<!-- 核心指标卡片 -->
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
+    <div class="card" style="margin:0; padding: 25px; text-align: center;">
+        <div style="font-size: 32px; font-weight: bold; color: #333;">{{ total_users }}</div>
+        <div style="color: #666; font-size: 13px; margin-top: 5px;">👥 总用户数</div>
+    </div>
+    <div class="card" style="margin:0; padding: 25px; text-align: center;">
+        <div style="font-size: 32px; font-weight: bold; color: #6f42c1;">{{ total_apps }}</div>
+        <div style="color: #666; font-size: 13px; margin-top: 5px;">🚀 总应用数</div>
+    </div>
+    <div class="card" style="margin:0; padding: 25px; text-align: center;">
+        <div style="font-size: 32px; font-weight: bold; color: #007bff;">{{ today_calls }}</div>
+        <div style="color: #666; font-size: 13px; margin-top: 5px;">📈 今日 API 调用</div>
+    </div>
+    <div class="card" style="margin:0; padding: 25px; text-align: center;">
+        <div style="font-size: 32px; font-weight: bold; color: #fd7e14;">{{ total_calls }}</div>
+        <div style="color: #666; font-size: 13px; margin-top: 5px;">📚 历史总调用</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+    <!-- 图表区域 -->
+    <div class="card" style="margin:0; min-height: 300px;">
+        <h3 style="margin-top:0; margin-bottom: 20px;">📊 API 流量趋势 (近7天)</h3>
+        <canvas id="trafficChart"></canvas>
+    </div>
+
+    <!-- 最近注册用户 -->
+    <div class="card" style="margin:0;">
+        <h3 style="margin-top:0; margin-bottom: 15px;">🆕 最新用户</h3>
+        <ul style="list-style: none; padding: 0; margin: 0;">
+            {% for u in recent_users %}
+            <li style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eee;">
+                <img src="{{ u.avatar }}" style="width: 30px; height: 30px; border-radius: 50%;">
+                <div style="flex: 1; overflow: hidden;">
+                    <div style="font-weight: 500; font-size: 14px;">{{ u.username }}</div>
+                    <div style="font-size: 11px; color: #999;">ID: {{ u.id }}</div>
+                </div>
+                {% if u.is_admin %}
+                <span style="font-size: 10px; background: #e9ecef; color: #333; padding: 2px 6px; border-radius: 4px;">Admin</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<script>
+    // 初始化图表
+    const ctx = document.getElementById('trafficChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels | tojson }},
+            datasets: [{
+                label: 'API 调用次数',
+                data: {{ chart_data | tojson }},
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { borderDash: [5, 5] } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+</script>
+{% endblock %}

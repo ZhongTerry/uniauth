@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="header-row">
+    <div>
+        <a href="/dashboard" style="text-decoration: none; color: #666; font-size: 14px;">← 返回仪表盘</a>
+        <h2 style="margin: 5px 0;">🌍 全站数据看板</h2>
+        <p style="margin:0; color:#666; font-size:13px;">UniAuth 平台实时运行状态</p>
+    </div>
+</div>
+
+<!-- 核心指标卡片 (3列布局) -->
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
+    <!-- 用户总数 -->
+    <div class="card" style="margin:0; padding: 25px; text-align: center; border-bottom: 4px solid #007bff;">
+        <div style="font-size: 36px; font-weight: bold; color: #333;">{{ total_users }}</div>
+        <div style="color: #666; font-size: 14px; margin-top: 5px;">👥 注册开发者</div>
+    </div>
+    
+    <!-- 应用总数 -->
+    <div class="card" style="margin:0; padding: 25px; text-align: center; border-bottom: 4px solid #6f42c1;">
+        <div style="font-size: 36px; font-weight: bold; color: #333;">{{ total_apps }}</div>
+        <div style="color: #666; font-size: 14px; margin-top: 5px;">🚀 接入应用数</div>
+    </div>
+    
+    <!-- 调用总数 -->
+    <div class="card" style="margin:0; padding: 25px; text-align: center; border-bottom: 4px solid #fd7e14;">
+        <div style="font-size: 36px; font-weight: bold; color: #333;">{{ total_calls }}</div>
+        <div style="color: #666; font-size: 14px; margin-top: 5px;">⚡ API 总调用次数</div>
+    </div>
+</div>
+
+<!-- 流量趋势图 -->
+<div class="card" style="margin:0;">
+    <h3 style="margin-top:0; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px;">
+        平台活跃趋势 (近7天)
+    </h3>
+    
+    <!-- [关键] 固定高度容器，防止图表无限拉伸 -->
+    <div style="position: relative; height: 350px; width: 100%;">
+        <canvas id="globalChart"></canvas>
+    </div>
+</div>
+
+<script>
+    const ctx = document.getElementById('globalChart').getContext('2d');
+    
+    // 创建渐变色背景
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(0, 123, 255, 0.3)');
+    gradient.addColorStop(1, 'rgba(0, 123, 255, 0)');
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels | tojson }},
+            datasets: [{
+                label: '全站 API 吞吐量',
+                data: {{ chart_data | tojson }},
+                borderColor: '#007bff',
+                backgroundColor: gradient,
+                borderWidth: 3,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#007bff',
+                pointRadius: 5,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false, // 配合外层 div 实现自适应
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    grid: { borderDash: [5, 5] },
+                    ticks: { precision: 0 } 
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="header-row">
+    <div>
+        <a href="/apps/{{ app.client_id }}" style="text-decoration: none; color: #666; font-size: 14px;">← 返回详情</a>
+        <h2 style="margin: 5px 0;">📈 数据统计: {{ app.name }}</h2>
+        <span style="color: #666; font-size: 13px;">过去 30 天的 API 调用分析</span>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 20px;">
+    
+    <!-- 左侧：流量趋势图 (折线) -->
+    <!-- [修复] 去掉了 card 的 min-height，改用内部容器控制高度 -->
+    <div class="card" style="margin: 0;">
+        <h3 style="margin-top:0; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px;">
+            流量趋势 (Daily Traffic)
+        </h3>
+        
+        <!-- [修复] 关键点：加了这个 relative 且固定高度的 div 包裹层 -->
+        <div style="position: relative; height: 400px; width: 100%;">
+            <canvas id="trendChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 右侧：接口分布图 (甜甜圈) -->
+    <div class="card" style="margin: 0;">
+        <h3 style="margin-top:0; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px;">
+            调用类型分布
+        </h3>
+        
+        <!-- 这里原本就是好的，因为有 height: 250px -->
+        <div style="position: relative; height: 250px; width: 100%;">
+            <canvas id="pieChart"></canvas>
+        </div>
+        
+        <div style="margin-top: 20px; font-size: 13px; color: #666; line-height: 1.6;">
+            <p><strong>Login (Token):</strong> 用户成功登录并获取授权的次数。</p>
+            <p><strong>API (User Info):</strong> 第三方应用拉取用户资料的次数。</p>
+            <p><strong>Refresh:</strong> 自动刷新令牌续期的次数。</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. 流量趋势图配置
+    const ctxTrend = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: {{ dates | tojson }}, 
+            datasets: [{
+                label: 'API Calls',
+                data: {{ trend_data | tojson }}, 
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#764ba2',
+                pointRadius: 4,
+                fill: true,
+                tension: 0.4 
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false, // 允许自适应容器高度
+            interaction: { intersect: false, mode: 'index' },
+            scales: {
+                y: { beginAtZero: true, grid: { borderDash: [5, 5] } },
+                x: { grid: { display: false } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 2. 饼图配置
+    const ctxPie = document.getElementById('pieChart').getContext('2d');
+    new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
+            labels: {{ pie_labels | tojson }},
+            datasets: [{
+                data: {{ pie_data | tojson }},
+                backgroundColor: [
+                    '#4facfe', // 蓝 Login
+                    '#00f2fe', // 青 UserInfo
+                    '#ff9a9e'  // 红 Refresh
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }
+            }
+        }
+    });
+</script>
+{% endblock %}
