@@ -165,7 +165,19 @@ class UsageLog(db.Model):
     client_id = db.Column(db.String(40), db.ForeignKey('oauth_apps.client_id'), nullable=False)
     endpoint = db.Column(db.String(20), nullable=False) 
     timestamp = db.Column(db.Float, default=time.time)
-
+class InviteLink(db.Model):
+    __tablename__ = 'invite_links'
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(50), unique=True, nullable=False) # 随机邀请码
+    max_uses = db.Column(db.Integer, default=1)                  # 最大使用次数
+    current_uses = db.Column(db.Integer, default=0)              # 已使用次数
+    expires_at = db.Column(db.DateTime, nullable=False)          # 过期时间
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    @property
+    def is_valid(self):
+        # 检查是否过期以及次数是否用完
+        return self.current_uses < self.max_uses and self.expires_at > datetime.datetime.utcnow()
 # === 辅助函数 ===
 def login_required(f):
     @wraps(f)
@@ -294,7 +306,42 @@ def login():
             return redirect(url_for('dashboard'))
         flash('用户名或密码错误', 'error')
     return render_template('login.html', mode='login', redirect_uri=target_url)
-
+@app.route('/register/invite/<code>', methods=['GET', 'POST'])
+def register_by_invite(code):
+    invite = InviteLink.query.filter_by(code=code).first()
+    
+    # 验证邀请链接有效性
+    if not invite or not invite.is_valid:
+        flash('邀请链接无效或已过期', 'error')
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash('请填写完整信息', 'error')
+        elif User.query.filter_by(username=username).first():
+            flash('用户名已存在', 'error')
+        else:
+            # 自动生成一个占位邮箱，因为 User 模型中 email 是必填且唯一的
+            dummy_email = f"invited_{username}_{secrets.token_hex(3)}@invited.local"
+            
+            new_user = User(
+                username=username,
+                password_hash=generate_password_hash(password),
+                email=dummy_email,
+                is_admin=False
+            )
+            # 更新邀请链接使用次数
+            invite.current_uses += 1
+            db.session.add(new_user)
+            db.session.commit()
+            
+            flash('注册成功，请登录', 'success')
+            return redirect(url_for('login'))
+            
+    return render_template('register_invite.html', code=code, invite=invite)
 @app.route('/register', methods=['GET', 'POST'])
 @limiter.limit("10 per hour")
 def register():
@@ -328,7 +375,7 @@ def register():
             flash('邮箱已存在', 'error')
         else:
             # 3. 创建用户
-            # is_first_user = (User.query.count() == 0)
+            is_first_user = (User.query.count() == 0)
             new_user = User(
                 username=username, 
                 password_hash=generate_password_hash(password), 
@@ -453,7 +500,35 @@ def profile():
 # === 管理面板 & 其他路由 (保持不变，省略以节省篇幅，请复制上一版的内容) ===
 # 请将上一版 app.py 中的 admin_stats, dashboard, app_details, oauth/* 等路由原样粘贴在此处
 # 务必保证代码完整性
+@app.route('/admin/invites', methods=['GET', 'POST'])
+@admin_required
+def admin_invites():
+    if request.method == 'POST':
+        max_uses = int(request.form.get('max_uses', 1))
+        days = int(request.form.get('days', 7))
+        
+        # 生成随机 12 位邀请码
+        code = secrets.token_hex(6)
+        expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=days)
+        
+        new_link = InviteLink(code=code, max_uses=max_uses, expires_at=expires_at)
+        db.session.add(new_link)
+        db.session.commit()
+        flash('邀请链接已生成', 'success')
+        return redirect(url_for('admin_invites'))
 
+    invites = InviteLink.query.order_by(InviteLink.id.desc()).all()
+    return render_template('admin_invites.html', invites=invites, now=datetime.datetime.utcnow())
+
+@app.route('/admin/invites/<int:id>/delete', methods=['POST'])
+@admin_required
+def delete_invite(id):
+    invite = db.session.get(InviteLink, id)
+    if invite:
+        db.session.delete(invite)
+        db.session.commit()
+        flash('邀请链接已删除', 'success')
+    return redirect(url_for('admin_invites'))
 @app.route('/admin/stats')
 @admin_required
 def admin_stats():

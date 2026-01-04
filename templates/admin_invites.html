@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-row">
+    <div>
+        <a href="/admin/stats" style="text-decoration: none; color: #666; font-size: 14px;">← 返回统计</a>
+        <h2 style="margin: 5px 0;">🎫 邀请码管理</h2>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-top:0;">生成新链接</h3>
+    <form method="POST" style="display: flex; gap: 15px; align-items: flex-end;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div style="flex: 1;">
+            <label class="p-label">最大使用次数</label>
+            <input type="number" name="max_uses" class="p-input" value="1" min="1">
+        </div>
+        <div style="flex: 1;">
+            <label class="p-label">有效期 (天)</label>
+            <input type="number" name="days" class="p-input" value="7" min="1">
+        </div>
+        <button type="submit" class="p-btn p-btn-primary" style="height: 42px;">生成链接</button>
+    </form>
+</div>
+
+<div class="card">
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+            <tr style="text-align: left; border-bottom: 2px solid #eee;">
+                <th style="padding: 10px;">邀请链接 (点击复制)</th>
+                <th>剩余次数</th>
+                <th>有效期至</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for invite in invites %}
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 15px 10px;">
+                    <code style="background: #f8f9fa; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #4f46e5;" 
+                          onclick="copyToClipboardText('{{ request.host_url.rstrip('/') }}{{ url_for('register_by_invite', code=invite.code) }}')">
+                        /register/invite/{{ invite.code }}
+                    </code>
+                </td>
+                <td>{{ invite.max_uses - invite.current_uses }} / {{ invite.max_uses }}</td>
+                <td>
+                    <span style="color: {{ 'red' if invite.expires_at < now else 'green' }}">
+                        {{ invite.expires_at.strftime('%Y-%m-%d %H:%M') }}
+                    </span>
+                </td>
+                <td>
+                    <form action="{{ url_for('delete_invite', id=invite.id) }}" method="POST" onsubmit="return confirm('确定删除？')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="p-btn p-btn-danger p-btn-sm">删除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function copyToClipboardText(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("✅ 链接已复制");
+        });
+    }
+</script>
+{% endblock %}
