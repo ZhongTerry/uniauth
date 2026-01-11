@@ -23,6 +23,7 @@ from dotenv import load_dotenv  # [新增]
 load_dotenv()
 from werkzeug.middleware.proxy_fix import ProxyFix # 确保导入了
 import random
+import string
 
 # [新增] 安全跳转校验函数
 def is_safe_url(target):
