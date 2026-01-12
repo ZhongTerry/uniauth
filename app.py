@@ -24,6 +24,7 @@ load_dotenv()
 from werkzeug.middleware.proxy_fix import ProxyFix # 确保导入了
 import random
 import string
+import dns.resolver
 
 # [新增] 安全跳转校验函数
 def is_safe_url(target):
@@ -238,46 +239,60 @@ def get_captcha():
     
     data = image.generate(captcha_text)
     return Response(data, mimetype='image/png')
-
+# 增强版白名单
+ALLOWED_EMAIL_DOMAINS = {
+    'qq.com', 'vip.qq.com', 'foxmail.com',
+    '163.com', 'vip.163.com', '126.com', 'yeah.net',
+    'sina.com', 'sina.cn', 'sohu.com',
+    'aliyun.com', '139.com', '189.cn', 'wo.cn'
+}
 @app.route('/send-code', methods=['POST'])
-@limiter.limit("5 per minute") # [限流] 防止邮件接口被刷
+@limiter.limit("5 per minute") 
 def send_email_code():
-    """发送邮件验证码"""
-    email = request.form.get('email')
+    """发送邮件验证码 (增强安全版)"""
+    email = request.form.get('email', '').strip().lower()
     img_code = request.form.get('img_code')
     
-    # 1. 校验图片验证码 (第一道防线)
+    # 1. 校验图片验证码
     if not img_code or img_code.lower() != session.get('img_captcha', ''):
         return jsonify({'status': 'error', 'message': '图片验证码错误'}), 400
     
-    # 2. 校验邮箱格式与白名单 (第二道防线)
+    # 2. 基础格式校验
     if not email or '@' not in email:
         return jsonify({'status': 'error', 'message': '邮箱格式错误'}), 400
     
-    domain = email.split('@')[-1].lower()
-    if domain not in ALLOWED_DOMAINS:
-        return jsonify({'status': 'error', 'message': f'不支持 {domain} 邮箱，请使用QQ/163等国内邮箱'}), 400
+    # 3. [核心修复] 白名单域名校验
+    username, domain = email.split('@')
+    if domain not in ALLOWED_EMAIL_DOMAINS:
+        return jsonify({'status': 'error', 'message': '仅支持国内常用邮箱 (QQ/网易/新浪等)，不支持国外或临时邮箱'}), 400
         
-    # 3. 检查邮箱是否已注册
+    # 4. [核心修复] DNS MX 记录校验 (防止乱填域名)
+    try:
+        # 查询该域名的邮件服务器记录
+        records = dns.resolver.resolve(domain, 'MX')
+        if not records:
+            raise Exception("No MX record")
+    except Exception:
+        return jsonify({'status': 'error', 'message': '该邮箱域名无法接收邮件，请检查拼写'}), 400
+
+    # 5. 检查是否已注册
     if User.query.filter_by(email=email).first():
         return jsonify({'status': 'error', 'message': '该邮箱已被注册'}), 400
 
-    # 4. 生成邮件验证码
+    # 6. 生成并发送
     email_code = ''.join(random.choices(string.digits, k=6))
     session['email_code'] = email_code
     session['email_code_time'] = time.time()
-    session['email_target'] = email # 绑定邮箱，防止发给A填给B
+    session['email_target'] = email 
     
-    # 5. 发送邮件 (异步建议用Celery，这里用同步简单实现)
     try:
         msg = Message('UniAuth 注册验证码', recipients=[email])
-        msg.body = f"欢迎注册 UniAuth！\n\n您的验证码是：{email_code}\n\n该验证码 10 分钟内有效。请勿泄露给他人。"
+        msg.body = f"您的验证码是：{email_code}\n有效期10分钟。"
         mail.send(msg)
         return jsonify({'status': 'success', 'message': '验证码已发送'})
     except Exception as e:
-        print(e)
-        return jsonify({'status': 'error', 'message': '邮件发送失败，请检查邮箱是否有效'}), 500
-
+        print(f"Mail Error: {e}")
+        return jsonify({'status': 'error', 'message': '邮件发送失败，请稍后重试'}), 500
 # === 路由：用户认证 ===
 
 @app.route('/login', methods=['GET', 'POST'])
